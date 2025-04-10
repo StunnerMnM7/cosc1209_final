@@ -5,7 +5,7 @@
     "GitHubOAuthTokenSecret": {
       "Type": "AWS::SecretsManager::Secret",
       "Properties": {
-        "Name": "wild rydes",
+        "Name": "wildrydes",
         "SecretString": "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"
       }
     },
