@@ -8,7 +8,7 @@
           "CidrBlock": "10.0.0.0/16",
           "EnableDnsSupport": true,
           "EnableDnsHostnames": true,
-          "Tags": [{ "Key": "Name", "Value": "FargateVPC" }]
+          "Tags": [{ "Key": "Name", "Value": "mihirVPC" }]
         }
       },
       "PublicSubnet1": {
@@ -84,9 +84,9 @@
           "ExecutionRoleArn": { "Ref": "ExecutionRole" },
           "ContainerDefinitions": [
             {
-              "Name": "assign1-server",
+              "Name": "cosc1209/cosc1209_final",
               "Image": "043309352934.dkr.ecr.us-east-1.amazonaws.com/cosc1209/final",
-              "PortMappings": [{ "ContainerPort": 80, "Protocol": "tcp" }]
+              "PortMappings": [{ "ContainerPort": 5000, "Protocol": "tcp" }]
             }
           ]
         }
