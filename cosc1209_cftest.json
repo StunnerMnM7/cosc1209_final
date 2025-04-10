@@ -245,7 +245,7 @@
         "RoleArn": { "Ref": "CodePipelineRole" },
         "ArtifactStore": {
           "Type": "S3",
-          "Location": "cosc1209pieplinebucket"
+          "Location": "my-artifact-store-bucket"
         },
         "Stages": [{
           "Name": "Source",
@@ -260,7 +260,9 @@
                 "Owner": "StunnerMnM7",
                 "Repo": "cosc1209_final",
                 "Branch": "main",
-                "OAuthToken": { "Ref": "GitHubOAuthToken" }
+                "OAuthToken": {
+                  "Ref": "GitHubOAuthTokenSecret"
+                }
               }
             },
             "OutputArtifacts": [{ "Name": "SourceOutput" }]
@@ -270,4 +272,5 @@
     }
   }
 }
+
 
