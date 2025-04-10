@@ -1,14 +1,21 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Deploy ECS Fargate with Networking",
+  "Description": "Wild Rydes - Infrastructure",
   "Resources": {
+    "GitHubOAuthTokenSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "wild rydes",
+        "SecretString": "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"
+      }
+    },
     "VPC": {
       "Type": "AWS::EC2::VPC",
       "Properties": {
         "CidrBlock": "10.0.0.0/16",
         "EnableDnsSupport": true,
         "EnableDnsHostnames": true,
-        "Tags": [{ "Key": "Name", "Value": "wild-rydesVPC" }]
+        "Tags": [{ "Key": "Name", "Value": "mihirVPC" }]
       }
     },
     "PublicSubnet1": {
@@ -39,10 +46,25 @@
         "InternetGatewayId": { "Ref": "InternetGateway" }
       }
     },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Allow HTTP traffic",
+        "VpcId": { "Ref": "VPC" },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
     "ECSCluster": {
       "Type": "AWS::ECS::Cluster",
       "Properties": {
-        "ClusterName": "Wild-RydesCluster"
+        "ClusterName": "FargateCluster"
       }
     },
     "ExecutionRole": {
@@ -84,24 +106,9 @@
         "ExecutionRoleArn": { "Ref": "ExecutionRole" },
         "ContainerDefinitions": [
           {
-            "Name": "cosc1209_final",
-            "Image": "043309352934.dkr.ecr.us-east-1.amazonaws.com/cosc1209/final:latest",
+            "Name": "cosc1209/final",
+            "Image": "043309352934.dkr.ecr.us-east-1.amazonaws.com/cosc1209/final",
             "PortMappings": [{ "ContainerPort": 5000, "Protocol": "tcp" }]
-          }
-        ]
-      }
-    },
-    "SecurityGroup": {
-      "Type": "AWS::EC2::SecurityGroup",
-      "Properties": {
-        "GroupDescription": "Allow HTTP traffic",
-        "VpcId": { "Ref": "VPC" },
-        "SecurityGroupIngress": [
-          {
-            "IpProtocol": "tcp",
-            "FromPort": 80,
-            "ToPort": 80,
-            "CidrIp": "0.0.0.0/0"
           }
         ]
       }
@@ -123,9 +130,8 @@
         "Port": 5000,
         "Protocol": "HTTP",
         "TargetType": "ip",
-        "HealthCheckProtocol": "HTTP",
         "HealthCheckPath": "/",
-        "Matcher": { "HttpCode": "200" }
+        "HealthCheckProtocol": "HTTP"
       }
     },
     "Listener": {
@@ -144,19 +150,124 @@
         "DesiredCount": 1,
         "LaunchType": "FARGATE",
         "TaskDefinition": { "Ref": "TaskDefinition" },
+        "LoadBalancers": [
+          {
+            "TargetGroupArn": { "Ref": "TargetGroup" },
+            "ContainerName": "cosc1209-app",
+            "ContainerPort": 5000
+          }
+        ],
         "NetworkConfiguration": {
           "AwsvpcConfiguration": {
             "Subnets": [{ "Ref": "PublicSubnet1" }, { "Ref": "PublicSubnet2" }],
             "SecurityGroups": [{ "Ref": "SecurityGroup" }],
             "AssignPublicIp": "ENABLED"
           }
+        }
+      }
+    },
+    "ScalableTarget": {
+      "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+      "Properties": {
+        "MaxCapacity": 3,
+        "MinCapacity": 1,
+        "ResourceId": {
+          "Fn::Join": [
+            "",
+            ["service/", { "Ref": "ECSCluster" }, "/", { "Fn::GetAtt": ["FargateService", "Name"] }]
+          ]
         },
-        "LoadBalancers": [{
-          "ContainerName": "cosc1209_final",
-          "ContainerPort": 5000,
-          "TargetGroupArn": { "Ref": "TargetGroup" }
+        "RoleARN": {
+          "Fn::GetAtt": ["AutoScalingRole", "Arn"]
+        },
+        "ScalableDimension": "ecs:service:DesiredCount",
+        "ServiceNamespace": "ecs"
+      }
+    },
+    "ScalingPolicy": {
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "Properties": {
+        "PolicyName": "CPUScalingPolicy",
+        "PolicyType": "TargetTrackingScaling",
+        "ScalingTargetId": { "Ref": "ScalableTarget" },
+        "TargetTrackingScalingPolicyConfiguration": {
+          "TargetValue": 50.0,
+          "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+          },
+          "ScaleInCooldown": 60,
+          "ScaleOutCooldown": 60
+        }
+      }
+    },
+    "AutoScalingRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "application-autoscaling.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "AutoScalingPermissions",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecs:UpdateService",
+                    "ecs:DescribeServices",
+                    "cloudwatch:PutMetricAlarm",
+                    "cloudwatch:DescribeAlarms",
+                    "cloudwatch:GetMetricStatistics",
+                    "cloudwatch:SetAlarmState",
+                    "cloudwatch:DeleteAlarms"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CodePipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "Name": "ECSPipeline",
+        "RoleArn": { "Ref": "CodePipelineRole" },
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": "cosc1209pieplinebucket"
+        },
+        "Stages": [{
+          "Name": "Source",
+          "Actions": [{
+            "Name": "GitHub_Source",
+            "ActionTypeId": {
+              "Category": "Source",
+              "Owner": "ThirdParty",
+              "Provider": "GitHub",
+              "Version": "1",
+              "Configuration": {
+                "Owner": "StunnerMnM7",
+                "Repo": "cosc1209_final",
+                "Branch": "main",
+                "OAuthToken": { "Ref": "GitHubOAuthToken" }
+              }
+            },
+            "OutputArtifacts": [{ "Name": "SourceOutput" }]
+          }]
         }]
       }
     }
   }
 }
+
