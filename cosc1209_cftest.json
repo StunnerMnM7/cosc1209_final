@@ -1,14 +1,7 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "Wild Rydes - Infrastructure",
-  "Resources": {
-    "GitHubOAuthTokenSecret": {
-      "Type": "AWS::SecretsManager::Secret",
-      "Properties": {
-        "Name": "wildrydes",
-        "SecretString": "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"
-      }
-    },
+    
     "VPC": {
       "Type": "AWS::EC2::VPC",
       "Properties": {
@@ -245,7 +238,7 @@
         "RoleArn": { "Ref": "CodePipelineRole" },
         "ArtifactStore": {
           "Type": "S3",
-          "Location": "my-artifact-store-bucket"
+          "Location": "cosc1209pieplinebucket"
         },
         "Stages": [{
           "Name": "Source",
@@ -260,9 +253,8 @@
                 "Owner": "StunnerMnM7",
                 "Repo": "cosc1209_final",
                 "Branch": "main",
-                "OAuthToken": {
-                  "Ref": "GitHubOAuthTokenSecret"
-                }
+                "OAuthToken": "arn:aws:secretsmanager:us-east-1:043309352934:secret:wildrydes-VV3M0F"
+    
               }
             },
             "OutputArtifacts": [{ "Name": "SourceOutput" }]
@@ -270,7 +262,7 @@
         }]
       }
     }
-  }
 }
+
 
 
